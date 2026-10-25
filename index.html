@@ -22,7 +22,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 60px}.hero{text-align:center
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
-<div id="app"><main><h1>جواهر الشرق</h1><p>يرجى تفعيل JavaScript لعرض المتجر.</p></main></div>
+<div id="app"><main><h1>جواهر الشرق</h1><p>جاري تحميل المتجر...</p></main></div>
 <script>
 'use strict';
 const T={
@@ -33,13 +33,19 @@ let L=localStorage.getItem('l')||'ar',I=Math.max(0,['ar','fa','en'].indexOf(L)),
 try{cart=JSON.parse(localStorage.getItem('jc')||'[]')}catch{}
 const t=k=>(T[k]||[k,k,k])[I],$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SU='https://ehotkukjhhhiaivemues.supabase.co',SK='sb_publishable_vLMHHQ6mB3RaNG5oSCLoKA_uf179cpv';
-const sb=supabase.createClient(SU,SK),sb2=supabase.createClient(SU,SK,{auth:{persistSession:false,autoRefreshToken:false}});
+let sb, sb2;
+try {
+  sb=supabase.createClient(SU,SK);
+  sb2=supabase.createClient(SU,SK,{auth:{persistSession:false,autoRefreshToken:false}});
+} catch(err) {
+  console.error("Supabase init error:", err);
+}
 const svc=()=>localStorage.setItem('jc',JSON.stringify(cart)),vn=id=>D.vendors.find(v=>v.id==id)||{},rs=p=>D.ratings.filter(r=>r.product_id==p.id).map(r=>r.stars),avg=p=>{let a=rs(p);return a.length?a.reduce((x,y)=>x+y,0)/a.length:0},stars=n=>'★'.repeat(Math.round(n))+'☆'.repeat(5-Math.round(n));
-async function who(){let {data:{session}}=await sb.auth.getSession();if(!session){S=null;return}let u=session.user;let [a,v]=await Promise.all([sb.from('admins').select('user_id').eq('user_id',u.id),sb.from('vendors').select('*').eq('user_id',u.id)]);S=a.data?.length?{role:'owner',id:u.id,name:'Admin',user:u}:v.data?.length?{role:'vendor',id:u.id,vid:v.data[0].id,name:v.data[0].name,phone:v.data[0].phone,user:u}:{role:'c',id:u.id,name:u.user_metadata?.name||u.email,user:u}}
-async function load(){let [v,p,r,s]=await Promise.all([sb.from('vendors').select('id,name,phone'),sb.from('products').select('*').order('created_at',{ascending:false}),sb.from('ratings').select('product_id,stars'),sb.from('settings').select('*')]);D.vendors=v.data||[];D.ratings=r.data||[];D.set={};(s.data||[]).forEach(x=>D.set[x.key]=x.value);D.products=(p.data||[]).map(x=>({id:x.id,v:x.vendor_id,name:x.name,desc:x.description,price:x.price,imgs:x.images||[]}))}
+async function who(){if(!sb)return;let {data:{session}}=await sb.auth.getSession();if(!session){S=null;return}let u=session.user;let [a,v]=await Promise.all([sb.from('admins').select('user_id').eq('user_id',u.id),sb.from('vendors').select('*').eq('user_id',u.id)]);S=a.data?.length?{role:'owner',id:u.id,name:'Admin',user:u}:v.data?.length?{role:'vendor',id:u.id,vid:v.data[0].id,name:v.data[0].name,phone:v.data[0].phone,user:u}:{role:'c',id:u.id,name:u.user_metadata?.name||u.email,user:u}}
+async function load(){if(!sb)return;let [v,p,r,s]=await Promise.all([sb.from('vendors').select('id,name,phone'),sb.from('products').select('*').order('created_at',{ascending:false}),sb.from('ratings').select('product_id,stars'),sb.from('settings').select('*')]);D.vendors=v.data||[];D.ratings=r.data||[];D.set={};(s.data||[]).forEach(x=>D.set[x.key]=x.value);D.products=(p.data||[]).map(x=>({id:x.id,v:x.vendor_id,name:x.name,desc:x.description,price:x.price,imgs:x.images||[]}))}
 function go(p=''){location.hash='#/'+p;R()}addEventListener('hashchange',R);
 function setL(l){L=l;I=['ar','fa','en'].indexOf(l);localStorage.setItem('l',l);R()}
-async function logout(){await sb.auth.signOut();S=null;go()}
+async function logout(){if(sb)await sb.auth.signOut();S=null;go()}
 function nav(){let h=`<a class="btn" onclick="go()">${t('home')}</a><a class="btn o" onclick="go('cart')">🛒 ${t('cart')} (${cart.length})</a><a class="btn o" onclick="go('support')">${t('support')}</a>`;if(!S)h+=`<a class="btn o" onclick="go('login')">${t('login')}</a><a class="btn o" onclick="go('join')">${t('join')}</a>`;else{if(S.role==='vendor')h+=`<a class="btn" onclick="go('vendor')">${t('mine')}</a>`;if(S.role==='owner')h+=`<a class="btn" onclick="go('jas-portal')">${t('settings')}</a>`;if(S.role==='c')h+=`<a class="btn o" onclick="go('account')">حسابي</a>`;h+=`<a class="btn o" onclick="logout()">${t('out')}</a>`}return h+`<select onchange="setL(this.value)"><option value="ar" ${L==='ar'?'selected':''}>العربية</option><option value="fa" ${L==='fa'?'selected':''}>فارسی</option><option value="en" ${L==='en'?'selected':''}>English</option></select>`}
 function pcard(p){let v=vn(p.v);return `<div class="card" onclick="go('p/${encodeURIComponent(p.id)}')"><div class="im">${p.imgs[0]?`<img src="${esc(p.imgs[0])}" alt="">`:'💎'}</div><div class="b"><b>${esc(p.name)}</b><div class="stars">${stars(avg(p))}</div><div class="pr">$${(+p.price||0).toFixed(2)}</div><span class="tag">${esc(v.name)}</span></div></div>`}
 function hgrid(){return D.products.filter(p=>(p.name+' '+(p.desc||'')).toLowerCase().includes(q.toLowerCase())).map(pcard).join('')||`<p>${t('empty')}</p>`}
@@ -49,94 +55,81 @@ function footer(){return `<footer><div class="logo">${t('brand')}</div><p><a onc
 function vstore(id){let v=vn(id);return v.id?`<h1>${esc(v.name)}</h1><p>${esc(v.phone)}</p><div class="grid">${D.products.filter(p=>p.v==id).map(pcard).join('')||t('empty')}</div>`:home()}
 function pp(id){let p=D.products.find(x=>x.id==id);if(!p)return home();let v=vn(p.v);return `<div class="pg"><div class="gal">${p.imgs.map(i=>`<img src="${esc(i)}" alt="">`).join('')||'<div class="gem">💎</div>'}</div><div><h1>${esc(p.name)}</h1><div class="stars">${stars(avg(p))} (${rs(p).length})</div><p>${esc(p.desc)}</p><h2 class="pr">$${(+p.price).toFixed(2)}</h2><button onclick="addc('${p.id}')">🛒 ${t('addcart')}</button><div class="box"><b>${t('contact')}:</b> ${esc(v.name)}<p>${esc(v.phone)}</p><a class="btn o" href="tel:${esc(v.phone)}">📞 اتصال</a>${v.phone?` <a class="btn" target="_blank" rel="noopener" href="https://wa.me/${esc(String(v.phone).replace(/\D/g,''))}">واتساب</a>`:''}</div><p>${[1,2,3,4,5].map(n=>`<a onclick="rt('${p.id}',${n})">★</a>`).join('')}</p></div></div>`}
 function addc(id){cart.push(id);svc();alert('تمت إضافة المنتج إلى السلة');R()}
-async function rt(id,n){let {error}=await sb.from('ratings').insert({product_id:id,stars:n});if(error){alert(t('err'));return}await load();R()}
-function cartv(){if(!cart.length)return `<h1>${t('cart')}</h1><p>${t('empty')}</p>`;let items=cart.map(id=>D.products.find(p=>p.id==id)).filter(Boolean),g={};items.forEach(p=>(g[p.v]=g[p.v]||[]).push(p));return `<h1>${t('cart')}</h1><div class="box"><input id="cn" placeholder="${t('name')}" value="${esc(S?.name||'')}"><label>بلد رقم الهاتف</label><select id="cc"><option value="sy">🇸🇾 سوريا (+963)</option><option value="iq">🇮🇶 العراق (+964)</option><option value="ir">🇮🇷 إيران (+98)</option><option value="nl">🇳🇱 هولندا (+31)</option></select><input id="cp" placeholder="رقم الهاتف المحلي بدون رمز الدولة" dir="ltr"></div>`+Object.keys(g).map(vid=>{let v=vn(vid),sum=g[vid].reduce((a,p)=>a+(+p.price||0),0);return `<div class="box"><b>${esc(v.name)}</b>${g[vid].map(p=>`<div class="row"><span>${esc(p.name)}</span><span class="pr">$${(+p.price).toFixed(2)}</span><button class="o" onclick="removeOne('${p.id}')">−</button></div>`).join('')}<hr><b>${t('total')}: $${sum.toFixed(2)}</b><p><button onclick="order('${vid}')">${t('checkout')}</button> <a class="btn o" href="tel:${esc(v.phone)}">📞 ${esc(v.phone)}</a></p></div>`}).join('')}
+async function rt(id,n){if(!sb)return;let {error}=await sb.from('ratings').insert({product_id:id,stars:n});if(error){alert(t('err'));return}await load();R()}
+function cartv(){if(!cart.length)return `<h1>${t('cart')}</h1><p>${t('empty')}</p>`;let items=cart.map(id=>D.products.find(p=>p.id==id)).filter(Boolean),g={};items.forEach(p=>(g[p.v]=g[p.v]||[]).push(p));return `<h1>${t('cart')}</h1><div class="box"><input id="cn" placeholder="${t('name')}" value="${esc(S?.name||'')}"><label>بلد رقم الهاتف</label><select id="cc"><option value="sy">🇸🇾 سوريا (+963)</option><option value="iq">🇮🇶 العراق (+964)</option><option value="ir">🇮 إيران (+98)</option><option value="nl">🇳🇱 هولندا (+31)</option></select><input id="cp" placeholder="رقم الهاتف المحلي بدون رمز الدولة" dir="ltr"></div>`+Object.keys(g).map(vid=>{let v=vn(vid),sum=g[vid].reduce((a,p)=>a+(+p.price||0),0);return `<div class="box"><b>${esc(v.name)}</b>${g[vid].map(p=>`<div class="row"><span>${esc(p.name)}</span><span class="pr">$${(+p.price).toFixed(2)}</span><button class="o" onclick="removeOne('${p.id}')">−</button></div>`).join('')}<hr><b>${t('total')}: $${sum.toFixed(2)}</b><p><button onclick="order('${vid}')">${t('checkout')}</button> <a class="btn o" href="tel:${esc(v.phone)}">📞 ${esc(v.phone)}</a></p></div>`}).join('')}
 function removeOne(id){let i=cart.indexOf(id);if(i>=0)cart.splice(i,1);svc();R()}
-async function order(vid){let its=cart.map(id=>D.products.find(p=>p.id==id)).filter(p=>p&&p.v==vid);if(!its.length)return;let customerName=$('#cn').value.trim(),localPhone=$('#cp').value.trim().replace(/\D/g,''),country=$('#cc')?.value||'sy',codes={sy:'963',iq:'964',ir:'98',nl:'31'},customerPhone=(codes[country]||'963')+localPhone;if(!customerName||!localPhone){alert('يرجى إدخال اسم الزبون ورقم هاتفه');return}let vendor=vn(vid),wa=String(vendor.phone||'').replace(/\D/g,'');if(!wa){alert('رقم البائع غير متوفر. يرجى التواصل مع الدعم.');return}let total=its.reduce((sum,p)=>sum+(+p.price||0),0),orderNo='JAS-'+Date.now().toString().slice(-8),date=new Date().toLocaleString(L==='ar'?'ar-SY':L==='fa'?'fa-IR':'en-US');let {error}=await sb.from('orders').insert({vendor_id:vid,customer_name:customerName,customer_phone:customerPhone,items:its.map(p=>`${p.name} x1`),total});if(error){alert('تعذر تسجيل الطلب في قاعدة البيانات. لم يتم حذف السلة.');return}let message=['💎 *طلب جديد من جواهر الشرق*',`رقم الطلب: ${orderNo}`,`التاريخ: ${date}`,`الزبون: ${customerName}`,`هاتف الزبون: +${customerPhone}`,`البائع: ${vendor.name||''}`,'','المنتجات:',...its.map((p,i)=>`${i+1}. ${p.name} — $${(+p.price).toFixed(2)} × 1`),'',`الإجمالي: $${total.toFixed(2)}`,'يرجى تأكيد التوفر والتوصيل والدفع.'].join('\n');let invoice=makeInvoice({its,customerName,customerPhone,vendor,total,orderNo,date});let blob=await new Promise(resolve=>invoice.toBlob(resolve,'image/png'));let file=new File([blob],`${orderNo}.png`,{type:'image/png'});let shared=false;if(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share){try{await navigator.share({files:[file],title:'صورة طلب جواهر الشرق',text:message});shared=true}catch(e){if(e.name==='AbortError')return}}if(!shared){downloadBlob(blob,`${orderNo}.png`);let link='https://wa.me/'+wa+'?text='+encodeURIComponent(message+'\n📎 تم حفظ صورة الطلب؛ يرجى إرفاق الصورة المحفوظة بالمحادثة.');window.open(link,'_blank','noopener');alert('تم تنزيل صورة الطلب وفتح واتساب. أرفق صورة '+orderNo+' من التنزيلات قبل الإرسال.')}cart=cart.filter(id=>!its.some(p=>p.id==id));svc();R()}
+async function order(vid){if(!sb)return;let its=cart.map(id=>D.products.find(p=>p.id==id)).filter(p=>p&&p.v==vid);if(!its.length)return;let customerName=$('#cn').value.trim(),localPhone=$('#cp').value.trim().replace(/\D/g,''),country=$('#cc')?.value||'sy',codes={sy:'963',iq:'964',ir:'98',nl:'31'},customerPhone=(codes[country]||'963')+localPhone;if(!customerName||!localPhone){alert('يرجى إدخال اسم الزبون ورقم هاتفه');return}let vendor=vn(vid),wa=String(vendor.phone||'').replace(/\D/g,'');if(!wa){alert('رقم البائع غير متوفر. يرجى التواصل مع الدعم.');return}let total=its.reduce((sum,p)=>sum+(+p.price||0),0),orderNo='JAS-'+Date.now().toString().slice(-8),date=new Date().toLocaleString(L==='ar'?'ar-SY':L==='fa'?'fa-IR':'en-US');let {error}=await sb.from('orders').insert({vendor_id:vid,customer_name:customerName,customer_phone:customerPhone,items:its.map(p=>`${p.name} x1`),total});if(error){alert('تعذر تسجيل الطلب في قاعدة البيانات. لم يتم حذف السلة.');return}let message=['💎 *طلب جديد من جواهر الشرق*',`رقم الطلب: ${orderNo}`,`التاريخ: ${date}`,`الزبون: ${customerName}`,`هاتف الزبون: +${customerPhone}`,`البائع: ${vendor.name||''}`,'','المنتجات:',...its.map((p,i)=>`${i+1}. ${p.name} — $${(+p.price).toFixed(2)} × 1`),'',`الإجمالي: $${total.toFixed(2)}`,'يرجى تأكيد التوفر والتوصيل والدفع.'].join('\n');let invoice=makeInvoice({its,customerName,customerPhone,vendor,total,orderNo,date});let blob=await new Promise(resolve=>invoice.toBlob(resolve,'image/png'));let file=new File([blob],`${orderNo}.png`,{type:'image/png'});let shared=false;if(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share){try{await navigator.share({files:[file],title:'صورة طلب جواهر الشرق',text:message});shared=true}catch(e){if(e.name==='AbortError')return}}if(!shared){downloadBlob(blob,`${orderNo}.png`);let link='https://wa.me/'+wa+'?text='+encodeURIComponent(message+'\n📎 تم حفظ صورة الطلب؛ يرجى إرفاق الصورة المحفوظة بالمحادثة.');window.open(link,'_blank','noopener');alert('تم تنزيل صورة الطلب وفتح واتساب. أرفق صورة '+orderNo+' من التنزيلات قبل الإرسال.')}cart=cart.filter(id=>!its.some(p=>p.id==id));svc();R()}
 function makeInvoice({its,customerName,customerPhone,vendor,total,orderNo,date}){let c=document.createElement('canvas');c.width=1000;c.height=Math.max(1050,460+its.length*145+200);let x=c.getContext('2d');x.fillStyle='#06130f';x.fillRect(0,0,c.width,c.height);x.strokeStyle='#d9b44a';x.lineWidth=4;x.strokeRect(24,24,c.width-48,c.height-48);x.fillStyle='#fbe7a1';x.textAlign='center';x.font='bold 48px Amiri, serif';x.fillText('💎 جواهر الشرق',500,100);x.font='bold 30px Amiri, serif';x.fillText('تفاصيل الطلب / ORDER RECEIPT',500,155);x.strokeStyle='#d9b44a';x.beginPath();x.moveTo(70,190);x.lineTo(930,190);x.stroke();x.textAlign='right';x.fillStyle='#f7f0dd';x.font='28px Amiri, serif';let y=245;for(let line of [`رقم الطلب: ${orderNo}`,`التاريخ: ${date}`,`الزبون: ${customerName}`,`هاتف الزبون: +${customerPhone}`,`البائع: ${vendor.name||''}`]){x.fillText(line,900,y);y+=48}y+=10;x.strokeStyle='#426a55';x.beginPath();x.moveTo(70,y);x.lineTo(930,y);x.stroke();y+=55;x.fillStyle='#fbe7a1';x.font='bold 30px Amiri, serif';x.fillText('المنتج',900,y);x.fillText('السعر',300,y);y+=30;x.fillStyle='#f7f0dd';x.font='26px Amiri, serif';for(let p of its){y+=65;x.fillText(String(p.name).slice(0,34),900,y);x.fillText('$'+(+p.price).toFixed(2)+' × 1',300,y);y+=25;x.strokeStyle='#29483c';x.beginPath();x.moveTo(70,y);x.lineTo(930,y);x.stroke()}y+=70;x.fillStyle='#fbe7a1';x.font='bold 38px Amiri, serif';x.fillText(`الإجمالي: $${total.toFixed(2)}`,900,y);y+=70;x.fillStyle='#b4a885';x.font='24px Amiri, serif';x.fillText('يرجى تأكيد توفر المنتجات والدفع والتوصيل مع البائع',900,y);return c}
 function downloadBlob(blob,name){let a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)}
 function authf(role,reg=false){return `<div class="box"><h2>${role==='o'?'دخول المالك':role==='v'?'دخول البائع':reg?t('reg'):t('login')}</h2>${reg?`<input id="an" placeholder="${t('name')}">`:''}<input id="ae" type="email" placeholder="${t('mail')}" dir="ltr"><input id="aw" type="password" placeholder="${t('pass')}" dir="ltr"><button onclick="auth('${role}',${reg})">${reg?t('reg'):'دخول'}</button><p id="am" class="err"></p></div>`}
 
-// --- [تصحيح دالة تسجيل الدخول والتحقق] ---
 async function auth(role,reg){
+  if(!sb)return;
   let em=$('#ae').value.trim(),pw=$('#aw').value,m=$('#am');
-  m.textContent = ''; // مسح الأخطاء القديمة
-  
-  if(!em || !pw){
-    m.textContent = 'يرجى إدخال البريد الإلكتروني وكلمة المرور';
-    return;
-  }
-
+  m.textContent='';
+  if(!em||!pw){m.textContent='يرجى إدخال البريد الإلكتروني وكلمة المرور';return;}
   if(reg){
     let r=await sb.auth.signUp({email:em,password:pw,options:{data:{name:$('#an')?.value||em}}});
-    if(r.error){
-      m.textContent = r.error.message;
-      return;
-    }
-    if(!r.data.session){
-      m.textContent='تحقق من بريدك الإلكتروني لتأكيد الحساب';
-      return;
-    }
-  } else {
+    if(r.error){m.textContent=r.error.message;return;}
+    if(!r.data.session){m.textContent='تحقق من بريدك الإلكتروني لتأكيد الحساب';return;}
+  }else{
     let r=await sb.auth.signInWithPassword({email:em,password:pw});
-    if(r.error){
-      // رسالة خطأ واضحة ومفهومة عند فشل تسجيل الدخول
-      m.textContent = 'خطأ في البريد أو كلمة المرور، يرجى المحاولة مجدداً';
-      return;
-    }
+    if(r.error){m.textContent='خطأ في البريد أو كلمة المرور، يرجى المحاولة مجدداً';return;}
   }
-  
   await who();
-  
   if((role==='o'&&S?.role!=='owner')||(role==='v'&&S?.role!=='vendor')){
-    await sb.auth.signOut();
-    S=null;
-    m.textContent='هذا الحساب لا يملك الصلاحية المطلوبة';
-    return;
+    await sb.auth.signOut();S=null;m.textContent='هذا الحساب لا يملك الصلاحية المطلوبة';return;
   }
-  
   await load();
   go(S?.role==='owner'?'jas-portal':S?.role==='vendor'?'vendor':'');
 }
 
 function loginp(reg=false){return authf('c',reg)+`<p><a onclick="go('${reg?'login':'register'}')">${reg?t('login'):t('reg')}</a> · <a onclick="go('vendor-login')">دخول البائع</a></p>`}
-
 function joinp(){return `<div class="box"><h2>${t('join')}</h2><input id="jn" placeholder="${t('name')}"><input id="jp" placeholder="${t('phone')}" dir="ltr"><input id="jm" placeholder="${t('mail')}" type="email" dir="ltr"><input id="jw" type="password" placeholder="${t('pass')}" dir="ltr"><button onclick="jr()">${t('save')}</button><p id="je" class="err"></p></div>`}
 
-// --- [تصحيح دالة انضمام البائع لتجنب أخطاء قاعدة البيانات] ---
 async function jr(){
+  if(!sb)return;
   let n=$('#jn').value.trim(),p=$('#jp').value.trim(),e=$('#jm').value.trim(),w=$('#jw').value;
-  let je = $('#je');
-  je.textContent = '';
-
-  if(!n||!p||!e||!w){
-    je.textContent='أكمل جميع الحقول المطلوبة';
-    return;
-  }
-
-  // 1. إنشاء حساب المستخدم في نظام التوثيق
-  let r=await sb.auth.signUp({email:e,password:w,options:{data:{name:n}}});
-  if(r.error){
-    je.textContent = r.error.message;
-    return;
-  }
-
-  let userId = r.data.user?.id || null;
-
-  // 2. إدخال البيانات في جدول البائعين أو الطلبات (يتم استخدام جدول vendors أو vendor_requests بحسب المتاح)
+  let je=$('#je');je.textContent='';
+  if(!n||!p||!e||!w){je.textContent='أكمل جميع الحقول المطلوبة';return;}
+  let r=await sb2.auth.signUp({email:e,password:w,options:{data:{name:n}}});
+  if(r.error){je.textContent=r.error.message;return;}
+  let userId=r.data.user?.id||null;
   let {error}=await sb.from('vendor_requests').insert({name:n,phone:p,email:e,user_id:userId});
-  
   if(error){
-    // محاولة إدراج بديلة في جدول vendors مباشرة إذا كان جدول vendor_requests غير موجود
-    let {error: err2} = await sb.from('vendors').insert({name:n,phone:p,user_id:userId});
-    if(err2){
-      je.textContent = 'حدث خطأ أثناء حفظ الطلب، يرجى المحاولة مجدداً';
-      return;
-    }
+    let {error:err2}=await sb.from('vendors').insert({name:n,phone:p,user_id:userId});
+    if(err2){je.textContent='حدث خطأ أثناء حفظ الطلب، يرجى المحاولة مجدداً';return;}
   }
-  
-  je.style.color = 'var(--gold2)';
-  je.textContent = t('sent');
+  je.style.color='var(--gold2)';
+  je.textContent=t('sent');
 }
 
-function support(){let s=D.set,wa=String(s.sw||'').replace(/\D/g,'');return `<h1 class="pr">${t('sup
+function support(){let s=D.set,wa=String(s.sw||'').replace(/\D/g,'');return `<h1 class="pr">${t('support')}</h1><p class="mut">فريق جواهر الشرق متواجد لمساعدتك</p><div class="row" style="align-items:flex-start"><div class="box"><h3>قنوات التواصل</h3>${wa?`<p><a class="btn" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">واتساب الدعم</a></p>`:''}${s.sp?`<p><a class="btn o" href="tel:${esc(s.sp)}">📞 اتصال: ${esc(s.sp)}</a></p>`:''}${s.se?`<p><a class="btn o" href="mailto:${esc(s.se)}">✉ ${esc(s.se)}</a></p>`:''}${s.si?`<p><a class="btn o" href="${esc(s.si)}" target="_blank" rel="noopener">Instagram</a></p>`:''}${s.sx?`<p><a class="btn o" href="${esc(s.sx)}" target="_blank" rel="noopener">Twitter / X</a></p>`:''}</div><div class="box"><h3>أرسل رسالة</h3><input id="tn" placeholder="${t('name')}"><input id="tp" placeholder="${t('phone')}" dir="ltr"><textarea id="tm" rows="4" placeholder="${t('supportmsg')}"></textarea><button onclick="tk()">${t('send')}</button><p id="te"></p></div></div>`}
+async function tk(){if(!sb)return;let msg=$('#tm').value.trim();if(!msg)return;let {error}=await sb.from('support_tickets').insert({name:$('#tn').value,phone:$('#tp').value,message:msg});$('#te').textContent=error?t('err'):t('received');if(!error)$('#tm').value=''}
+async function vendorPortal(){if(S?.role!=='vendor')return go('login');let my=D.products.filter(p=>p.v===S.vid);return `<h1>${t('mine')} (${esc(S.name)})</h1><p><button onclick="go('add')">${t('add')}</button></p><div class="grid">${my.map(pcard).join('')||t('empty')}</div>`}
+async function addProductForm(){if(S?.role!=='vendor')return go('login');return `<div class="box"><h2>${t('add')}</h2><input id="pn" placeholder="${t('name')}"><textarea id="pd" rows="3" placeholder="${t('desc')}"></textarea><input id="pp" type="number" step="0.01" placeholder="${t('price')}"><input id="pi" placeholder="رابط الصورة (URL)"><button onclick="saveProduct()">${t('save')}</button><p id="pe" class="err"></p></div>`}
+async function saveProduct(){if(!sb)return;let n=$('#pn').value.trim(),d=$('#pd').value.trim(),pr=$('#pp').value,img=$('#pi').value.trim();if(!n||!pr){$('#pe').textContent='أدخل اسم المنتج والسعر';return}let {error}=await sb.from('products').insert({vendor_id:S.vid,name:n,description:d,price:parseFloat(pr),images:img?[img]:[]});if(error){$('#pe').textContent=t('err');return}await load();go('vendor')}
+async function adminPortal(){if(S?.role!=='owner')return go('login');let [reqs,ors]=await Promise.all([sb.from('vendor_requests').select('*'),sb.from('orders').select('*').order('created_at',{ascending:false})]);let rLst=reqs.data||[],oLst=ors.data||[];return `<h1>لوحة التحكم</h1><h2 class="t">طلبات البائعين</h2><div class="box wide"><table><tr><th>الاسم</th><th>الهاتف</th><th>البريد</th><th>إجراء</th></tr>${rLst.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.phone)}</td><td>${esc(r.email)}</td><td><button onclick="appV('${r.id}')">${t('approve')}</button> <button class="d" onclick="rejV('${r.id}')">${t('reject')}</button></td></tr>`).join('')||`<tr><td colspan="4">${t('empty')}</td></tr>`}</table></div><h2 class="t">الطلبات المسجلة</h2><div class="box wide"><table><tr><th>رقم الطلب</th><th>الزبون</th><th>الهاتف</th><th>المبلغ</th><th>التاريخ</th></tr>${oLst.map(o=>`<tr><td>${esc(o.id)}</td><td>${esc(o.customer_name)}</td><td>${esc(o.customer_phone)}</td><td>$${(+o.total).toFixed(2)}</td><td>${new Date(o.created_at).toLocaleString()}</td></tr>`).join('')||`<tr><td colspan="5">${t('empty')}</td></tr>`}</table></div>`}
+async function appV(id){if(!sb)return;let {data:r}=await sb.from('vendor_requests').select('*').eq('id',id).single();if(!r)return;let {error}=await sb.from('vendors').insert({name:r.name,phone:r.phone,user_id:r.user_id});if(!error)await sb.from('vendor_requests').delete().eq('id',id);await load();R()}
+async function rejV(id){if(!sb)return;await sb.from('vendor_requests').delete().eq('id',id);await load();R()}
+async function R(){let hash=location.hash.slice(2),m=$('#app');if(!m)return;m.innerHTML=`<header><div class="logo" onclick="go()">${t('brand')}</div><nav>${nav()}</nav></header><main id="main"></main>${footer()}`;let mm=$('#main');
+try{
+if(!D.products.length)await load();
+if(hash===''||hash==='/')mm.innerHTML=home();
+else if(hash.startsWith('v/'))mm.innerHTML=vstore(hash.split('/')[1]);
+else if(hash.startsWith('p/'))mm.innerHTML=pp(hash.split('/')[1]);
+else if(hash==='cart')mm.innerHTML=cartv();
+else if(hash==='support')mm.innerHTML=support();
+else if(hash==='login')mm.innerHTML=loginp(false);
+else if(hash==='register')mm.innerHTML=loginp(true);
+else if(hash==='vendor-login')mm.innerHTML=authf('v');
+else if(hash==='join')mm.innerHTML=joinp();
+else if(hash==='vendor')mm.innerHTML=await vendorPortal();
+else if(hash==='add')mm.innerHTML=await addProductForm();
+else if(hash==='jas-portal')mm.innerHTML=await adminPortal();
+else mm.innerHTML=home();
+}catch(e){mm.innerHTML=`<p class="err">${t('err')}</p>`}}
+(async()=>{await who();await load();R()})();
+</script>
+</body>
+</html>
