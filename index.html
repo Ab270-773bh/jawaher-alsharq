@@ -56,35 +56,87 @@ async function order(vid){let its=cart.map(id=>D.products.find(p=>p.id==id)).fil
 function makeInvoice({its,customerName,customerPhone,vendor,total,orderNo,date}){let c=document.createElement('canvas');c.width=1000;c.height=Math.max(1050,460+its.length*145+200);let x=c.getContext('2d');x.fillStyle='#06130f';x.fillRect(0,0,c.width,c.height);x.strokeStyle='#d9b44a';x.lineWidth=4;x.strokeRect(24,24,c.width-48,c.height-48);x.fillStyle='#fbe7a1';x.textAlign='center';x.font='bold 48px Amiri, serif';x.fillText('💎 جواهر الشرق',500,100);x.font='bold 30px Amiri, serif';x.fillText('تفاصيل الطلب / ORDER RECEIPT',500,155);x.strokeStyle='#d9b44a';x.beginPath();x.moveTo(70,190);x.lineTo(930,190);x.stroke();x.textAlign='right';x.fillStyle='#f7f0dd';x.font='28px Amiri, serif';let y=245;for(let line of [`رقم الطلب: ${orderNo}`,`التاريخ: ${date}`,`الزبون: ${customerName}`,`هاتف الزبون: +${customerPhone}`,`البائع: ${vendor.name||''}`]){x.fillText(line,900,y);y+=48}y+=10;x.strokeStyle='#426a55';x.beginPath();x.moveTo(70,y);x.lineTo(930,y);x.stroke();y+=55;x.fillStyle='#fbe7a1';x.font='bold 30px Amiri, serif';x.fillText('المنتج',900,y);x.fillText('السعر',300,y);y+=30;x.fillStyle='#f7f0dd';x.font='26px Amiri, serif';for(let p of its){y+=65;x.fillText(String(p.name).slice(0,34),900,y);x.fillText('$'+(+p.price).toFixed(2)+' × 1',300,y);y+=25;x.strokeStyle='#29483c';x.beginPath();x.moveTo(70,y);x.lineTo(930,y);x.stroke()}y+=70;x.fillStyle='#fbe7a1';x.font='bold 38px Amiri, serif';x.fillText(`الإجمالي: $${total.toFixed(2)}`,900,y);y+=70;x.fillStyle='#b4a885';x.font='24px Amiri, serif';x.fillText('يرجى تأكيد توفر المنتجات والدفع والتوصيل مع البائع',900,y);return c}
 function downloadBlob(blob,name){let a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)}
 function authf(role,reg=false){return `<div class="box"><h2>${role==='o'?'دخول المالك':role==='v'?'دخول البائع':reg?t('reg'):t('login')}</h2>${reg?`<input id="an" placeholder="${t('name')}">`:''}<input id="ae" type="email" placeholder="${t('mail')}" dir="ltr"><input id="aw" type="password" placeholder="${t('pass')}" dir="ltr"><button onclick="auth('${role}',${reg})">${reg?t('reg'):'دخول'}</button><p id="am" class="err"></p></div>`}
-async function auth(role,reg){let em=$('#ae').value.trim(),pw=$('#aw').value,m=$('#am');if(reg){let r=await sb.auth.signUp({email:em,password:pw,options:{data:{name:$('#an').value||em}}});if(r.error){m.textContent=r.error.message;return}if(!r.data.session){m.textContent='تحقق من بريدك الإلكتروني لتأكيد الحساب';return}}else{let r=await sb.auth.signInWithPassword({email:em,password:pw});if(r.error){m.textContent=t('err');return}}await who();if((role==='o'&&S?.role!=='owner')||(role==='v'&&S?.role!=='vendor')){await sb.auth.signOut();S=null;m.textContent='هذا الحساب لا يملك الصلاحية المطلوبة';return}await load();go(S?.role==='owner'?'jas-portal':S?.role==='vendor'?'vendor':'')}
+
+// --- [تصحيح دالة تسجيل الدخول والتحقق] ---
+async function auth(role,reg){
+  let em=$('#ae').value.trim(),pw=$('#aw').value,m=$('#am');
+  m.textContent = ''; // مسح الأخطاء القديمة
+  
+  if(!em || !pw){
+    m.textContent = 'يرجى إدخال البريد الإلكتروني وكلمة المرور';
+    return;
+  }
+
+  if(reg){
+    let r=await sb.auth.signUp({email:em,password:pw,options:{data:{name:$('#an')?.value||em}}});
+    if(r.error){
+      m.textContent = r.error.message;
+      return;
+    }
+    if(!r.data.session){
+      m.textContent='تحقق من بريدك الإلكتروني لتأكيد الحساب';
+      return;
+    }
+  } else {
+    let r=await sb.auth.signInWithPassword({email:em,password:pw});
+    if(r.error){
+      // رسالة خطأ واضحة ومفهومة عند فشل تسجيل الدخول
+      m.textContent = 'خطأ في البريد أو كلمة المرور، يرجى المحاولة مجدداً';
+      return;
+    }
+  }
+  
+  await who();
+  
+  if((role==='o'&&S?.role!=='owner')||(role==='v'&&S?.role!=='vendor')){
+    await sb.auth.signOut();
+    S=null;
+    m.textContent='هذا الحساب لا يملك الصلاحية المطلوبة';
+    return;
+  }
+  
+  await load();
+  go(S?.role==='owner'?'jas-portal':S?.role==='vendor'?'vendor':'');
+}
+
 function loginp(reg=false){return authf('c',reg)+`<p><a onclick="go('${reg?'login':'register'}')">${reg?t('login'):t('reg')}</a> · <a onclick="go('vendor-login')">دخول البائع</a></p>`}
-function joinp(){return `<div class="box"><h2>${t('join')}</h2><input id="jn" placeholder="${t('name')}"><input id="jp" placeholder="${t('phone')}" dir="ltr"><input id="jm" placeholder="${t('mail')}" type="email" dir="ltr"><input id="jw" type="password" placeholder="${t('pass')}" dir="ltr"><button onclick="jr()">${t('save')}</button><p id="je"></p></div>`}
-async function jr(){let n=$('#jn').value.trim(),p=$('#jp').value.trim(),e=$('#jm').value.trim(),w=$('#jw').value;if(!n||!p||!e||!w){alert('أكمل جميع الحقول');return}let r=await sb2.auth.signUp({email:e,password:w,options:{data:{name:n}}});if(r.error){$('#je').textContent=r.error.message;return}let {error}=await sb.from('vendor_requests').insert({name:n,phone:p,email:e,user_id:r.data.user?.id||null});$('#je').textContent=error?t('err'):t('sent')}
-function support(){let s=D.set,wa=String(s.sw||'').replace(/\D/g,'');return `<h1 class="pr">${t('support')}</h1><p class="mut">فريق جواهر الشرق متواجد لمساعدتك</p><div class="row" style="align-items:flex-start"><div class="box"><h3>قنوات التواصل</h3>${wa?`<p><a class="btn" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">واتساب الدعم</a></p>`:''}${s.sp?`<p><a class="btn o" href="tel:${esc(s.sp)}">📞 اتصال: ${esc(s.sp)}</a></p>`:''}${s.se?`<p><a class="btn o" href="mailto:${esc(s.se)}">✉ ${esc(s.se)}</a></p>`:''}${s.si?`<p><a class="btn o" href="${esc(s.si)}" target="_blank" rel="noopener">Instagram</a></p>`:''}${s.sx?`<p><a class="btn o" href="${esc(s.sx)}" target="_blank" rel="noopener">Twitter / X</a></p>`:''}</div><div class="box"><h3>أرسل رسالة</h3><input id="tn" placeholder="${t('name')}"><input id="tp" placeholder="${t('phone')}" dir="ltr"><textarea id="tm" rows="4" placeholder="${t('supportmsg')}"></textarea><button onclick="tk()">${t('send')}</button><p id="te"></p></div></div>`}
-async function tk(){let msg=$('#tm').value.trim();if(!msg)return;let {error}=await sb.from('support_tickets').insert({name:$('#tn').value,phone:$('#tp').value,message:msg});$('#te').textContent=error?t('err'):t('received')}
-function pform(sel){return `<div class="box wide"><h3>${t('add')}</h3>${sel?`<select id="pv">${D.vendors.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('')}</select>`:''}<input id="pn" placeholder="${t('name')}"><textarea id="pd" rows="3" placeholder="${t('desc')}"></textarea><input id="pr" type="number" min="0" step=".01" placeholder="${t('price')}"><label>${t('photos')}<input id="pf" type="file" accept="image/*" multiple></label><button id="pb" onclick="ap()">${t('add')}</button></div>`}
-function resizeImage(file){return new Promise(resolve=>{let i=new Image();i.onload=()=>{let k=Math.min(1,900/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);c.toBlob(resolve,'image/jpeg',.8)};i.src=URL.createObjectURL(file)})}
-async function ap(){let n=$('#pn').value.trim(),vid=S.role==='owner'?$('#pv').value:S.vid;if(!n||!vid){alert('أدخل اسم المنتج واختر البائع');return}let b=$('#pb');b.disabled=true;let urls=[],k=0;for(let f of [...$('#pf').files].slice(0,8)){let bl=await resizeImage(f),path=`${vid}/${Date.now()}-${k++}.jpg`,u=await sb.storage.from('products').upload(path,bl,{contentType:'image/jpeg'});if(!u.error)urls.push(sb.storage.from('products').getPublicUrl(path).data.publicUrl)}let {error}=await sb.from('products').insert({vendor_id:vid,name:n,description:$('#pd').value,price:+$('#pr').value||0,images:urls});b.disabled=false;if(error){alert(t('err'));return}await load();R()}
-async function dp(id){if(!confirm('هل تريد حذف المنتج؟'))return;let {error}=await sb.from('products').delete().eq('id',id);if(error){alert(t('err'));return}await load();R()}
-function ords(list){return list?.length?`<table><tr><th>التاريخ</th><th>الزبون</th><th>المنتجات</th><th>الإجمالي</th></tr>${list.map(x=>`<tr><td>${esc((x.created_at||'').slice(0,10))}</td><td>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</td><td>${(x.items||[]).map(esc).join('، ')}</td><td>$${(+x.total).toFixed(2)}</td></tr>`).join('')}</table>`:`<p>${t('empty')}</p>`}
-function sellerPhoneParts(value){let n=String(value||'').replace(/\D/g,'');for(let [code,country] of [['964','iq'],['963','sy'],['98','ir'],['31','nl']])if(n.startsWith(code))return {country,local:n.slice(code.length)};return {country:'sy',local:n.replace(/^0+/, '')}}
-function vpanel(){if(S?.role!=='vendor')return authf('v');let ph=sellerPhoneParts(S.phone);return `<h1>${esc(S.name)}</h1><div class="box wide"><h3>تعديل بيانات متجري</h3><label>اسم المتجر / اسم البائع</label><input id="vprofname" value="${esc(S.name||'')}"><label>بلد رقم الهاتف</label><select id="vprofcountry"><option value="sy" ${ph.country==='sy'?'selected':''}>سوريا (+963)</option><option value="iq" ${ph.country==='iq'?'selected':''}>العراق (+964)</option><option value="ir" ${ph.country==='ir'?'selected':''}>إيران (+98)</option><option value="nl" ${ph.country==='nl'?'selected':''}>هولندا (+31)</option></select><label>رقم الهاتف المحلي (بدون رمز الدولة)</label><input id="vprofphone" value="${esc(ph.local)}" dir="ltr" inputmode="tel" placeholder="أدخل رقمك المحلي"><p class="mut">سيُحفظ الرقم مع رمز الدولة، ويُستخدم للاتصال وواتساب.</p><button onclick="saveVendorProfile()">حفظ بيانات المتجر</button></div>${pform(false)}<h2>${t('mine')} — تعديل المنتجات</h2><table>${D.products.filter(p=>p.v==S.vid).map(p=>`<tr><td>${esc(p.name)}</td><td>$${(+p.price).toFixed(2)}</td><td><button onclick="editp('${p.id}')">تعديل المنتج</button> <button class="d" onclick="dp('${p.id}')">${t('del')}</button><div id="edit-${p.id}"></div></td></tr>`).join('')}</table><h2>${t('orders')}</h2>${ords(X.orders)}`}
-async function saveVendorProfile(){if(S?.role!=='vendor')return;let name=$('#vprofname').value.trim(),local=$('#vprofphone').value.trim().replace(/\D/g,''),country=$('#vprofcountry').value,codes={sy:'963',iq:'964',ir:'98',nl:'31'},phone=(codes[country]||'963')+local.replace(/^0+/, '');if(!name||!local){alert('أدخل اسم المتجر ورقم الهاتف');return}let {error}=await sb.from('vendors').update({name,phone}).eq('id',S.vid).eq('user_id',S.id);if(error){alert('تعذر حفظ بيانات المتجر: '+error.message);return}S.name=name;S.phone=phone;await load();alert('تم حفظ اسم المتجر ورقم الهاتف مع رمز الدولة');R()}
-async function av(){let n=$('#vn').value.trim(),p=$('#vp').value.trim(),e=$('#ve').value.trim(),w=$('#vw').value;if(!n||!p||!e||!w){alert('أكمل بيانات البائع');return}let r=await sb2.auth.signUp({email:e,password:w,options:{data:{name:n}}});if(r.error||!r.data.user){alert(r.error?.message||t('err'));return}let {error}=await sb.from('vendors').insert({name:n,phone:p,user_id:r.data.user.id});if(error){alert(t('err'));return}await load();R()}
-async function rq(id,yes){let r=X.reqs.find(x=>x.id==id);if(yes&&r?.user_id){let {error}=await sb.from('vendors').insert({name:r.name,phone:r.phone,user_id:r.user_id});if(error){alert(t('err'));return}}let {error}=await sb.from('vendor_requests').delete().eq('id',id);if(error){alert(t('err'));return}await load();R()}
-async function dv(id){if(!confirm('حذف البائع؟'))return;let {error}=await sb.from('vendors').delete().eq('id',id);if(error){alert(t('err'));return}await load();R()}
-async function ss2(){let fields=[['sw','#sw'],['sp','#sp'],['se','#se'],['si','#si'],['sx','#sx']];let values=fields.map(([key,selector])=>({key,value:$(selector).value.trim()}));let {error}=await sb.from('settings').upsert(values);if(error){alert('تعذر حفظ الإعدادات. تحقق من صلاحيات جدول settings.');return}if($('#op').value){let r=await sb.auth.updateUser({password:$('#op').value});if(r.error){alert('تعذر تغيير كلمة المرور');return}}await load();R()}
-function opanel(){if(S?.role!=='owner')return authf('o');let s=D.set;return `<h1>${t('settings')}</h1><div class="box wide"><h3>${t('reqs')}</h3>${(X.reqs||[]).map(r=>`<div class="row"><b>${esc(r.name)}</b> ${esc(r.phone)} ${esc(r.email)} <button onclick="rq('${r.id}',true)">${t('approve')}</button><button class="d" onclick="rq('${r.id}',false)">${t('reject')}</button></div>`).join('')||t('empty')}</div><div class="box wide"><h3>إضافة بائع</h3><div class="row"><input id="vn" placeholder="اسم البائع"><input id="vp" placeholder="هاتف وواتساب" dir="ltr"><input id="ve" placeholder="البريد الإلكتروني" dir="ltr"><input id="vw" type="password" placeholder="كلمة مرور مؤقتة" dir="ltr"><button onclick="av()">إضافة</button></div><table>${D.vendors.map(v=>`<tr><td>${esc(v.name)}</td><td>${esc(v.phone)}</td><td>${D.products.filter(p=>p.v==v.id).length}</td><td><button class="d" onclick="dv('${v.id}')">${t('del')}</button></td></tr>`).join('')}</table></div>${D.vendors.length?pform(true):''}<div class="box wide"><h3>${t('products')}</h3><table>${D.products.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(vn(p.v).name)}</td><td>$${(+p.price).toFixed(2)}</td><td><button onclick="editp('${p.id}')">تعديل</button> <button class="d" onclick="dp('${p.id}')">${t('del')}</button><div id="edit-${p.id}"></div></td></tr>`).join('')}</table></div><div class="box wide"><h3>${t('orders')}</h3>${ords(X.orders)}</div><div class="box wide"><h3>رسائل الدعم</h3>${(X.tix||[]).map(x=>`<p><b>${esc(x.name)}</b> · ${esc(x.phone)}<br>${esc(x.message)}</p>`).join('')||t('empty')}</div><div class="box wide"><h3>بيانات التواصل والدعم الفني</h3><label>واتساب الدعم (مع رمز الدولة)</label><input id="sw" value="${esc(s.sw||'')}" placeholder="9639xxxxxxxx" dir="ltr"><label>رقم الاتصال العادي</label><input id="sp" value="${esc(s.sp||'')}" placeholder="9639xxxxxxxx" dir="ltr"><label>البريد الإلكتروني</label><input id="se" type="email" value="${esc(s.se||'')}" placeholder="support@example.com" dir="ltr"><label>رابط إنستغرام</label><input id="si" type="url" value="${esc(s.si||'')}" placeholder="https://www.instagram.com/youraccount/" dir="ltr"><label>رابط تويتر / X</label><input id="sx" type="url" value="${esc(s.sx||'')}" placeholder="https://x.com/youraccount" dir="ltr"><label>تغيير كلمة مرور حساب المالك (اختياري)</label><input id="op" type="password" placeholder="كلمة المرور الجديدة" dir="ltr"><button onclick="ss2()">${t('save')}</button></div>`}
 
-function accountp(){if(!S||S.role!=='c')return `<div class="box"><p>سجّل الدخول أولاً لفتح حسابك.</p>${authf('c')}</div>`;let u=S.user||{};return `<h1>حسابي</h1><div class="box wide"><label>الاسم</label><input id="acname" value="${esc(S.name||'')}"><label>البريد الإلكتروني</label><input id="acemail" type="email" value="${esc(u.email||'')}" dir="ltr"><label>بلد رقم الهاتف</label><select id="accountry"><option value="sy">سوريا (+963)</option><option value="iq">العراق (+964)</option><option value="ir">إيران (+98)</option><option value="nl">هولندا (+31)</option></select><label>رقم الجوال المحلي دون رمز الدولة</label><input id="acphone" dir="ltr" value="${esc(u.user_metadata?.local_phone||'')}"><hr><label>كلمة المرور الجديدة (اتركها فارغة إذا لا تريد تغييرها)</label><input id="acpass" type="password" autocomplete="new-password"><label>تأكيد كلمة المرور الجديدة</label><input id="acpass2" type="password" autocomplete="new-password"><button onclick="saveAccount()">حفظ التعديلات</button><p id="acmsg" class="err"></p></div>`}
-async function saveAccount(){let name=$('#acname').value.trim(),email=$('#acemail').value.trim(),phone=$('#acphone').value.trim().replace(/\D/g,''),country=$('#accountry').value,pw=$('#acpass').value,pw2=$('#acpass2').value,msg=$('#acmsg');if(!name||!email){msg.textContent='أدخل الاسم والبريد الإلكتروني';return}if(pw!==pw2){msg.textContent='كلمتا المرور غير متطابقتين';return}if(pw&&pw.length<6){msg.textContent='كلمة المرور يجب أن تكون 6 أحرف على الأقل';return}let data={data:{name,local_phone:phone,phone_country:country}};if(email)data.email=email;if(pw)data.password=pw;let r=await sb.auth.updateUser(data);if(r.error){msg.textContent='تعذر حفظ البيانات: '+r.error.message;return}S.name=name;S.user=r.data.user;msg.textContent='تم حفظ بيانات الحساب. قد تحتاج لتأكيد البريد الجديد من رسالة تصل إليك.';$('#acpass').value='';$('#acpass2').value=''}
-function editp(id){let p=D.products.find(x=>x.id==id);if(!p)return;let allowed=S?.role==='owner'||(S?.role==='vendor'&&S.vid==p.v);if(!allowed){alert('لا تملك صلاحية تعديل هذا المنتج');return}$('#edit-'+id).innerHTML=`<div class="box wide"><label>اسم المنتج</label><input id="en-${id}" value="${esc(p.name)}"><label>الوصف</label><textarea id="ed-${id}">${esc(p.desc||'')}</textarea><label>السعر بالدولار</label><input id="ep-${id}" type="number" min="0" step=".01" value="${+p.price||0}"><label>إضافة صور جديدة (اختياري؛ تستبدل الصور الحالية عند اختيار صور)</label><input id="ef-${id}" type="file" accept="image/*" multiple><button onclick="saveProduct('${id}')">حفظ المنتج</button> <button class="o" onclick="R()">إلغاء</button></div>`}
-async function saveProduct(id){let p=D.products.find(x=>x.id==id);if(!p)return;let allowed=S?.role==='owner'||(S?.role==='vendor'&&S.vid==p.v);if(!allowed){alert('لا تملك صلاحية تعديل هذا المنتج');return}let name=$('#en-'+id).value.trim(),price=Number($('#ep-'+id).value);if(!name||!Number.isFinite(price)||price<0){alert('تحقق من الاسم والسعر');return}let imgs=p.imgs||[],files=[...$('#ef-'+id).files].slice(0,8);if(files.length){let urls=[],k=0;for(let f of files){let bl=await resizeImage(f),path=`${p.v}/${Date.now()}-${k++}.jpg`,u=await sb.storage.from('products').upload(path,bl,{contentType:'image/jpeg'});if(u.error){alert('تعذر رفع إحدى الصور');return}urls.push(sb.storage.from('products').getPublicUrl(path).data.publicUrl)}imgs=urls}let {error}=await sb.from('products').update({name,description:$('#ed-'+id).value,price,images:imgs}).eq('id',id);if(error){alert('تعذر تعديل المنتج: '+error.message);return}await load();R()}
+function joinp(){return `<div class="box"><h2>${t('join')}</h2><input id="jn" placeholder="${t('name')}"><input id="jp" placeholder="${t('phone')}" dir="ltr"><input id="jm" placeholder="${t('mail')}" type="email" dir="ltr"><input id="jw" type="password" placeholder="${t('pass')}" dir="ltr"><button onclick="jr()">${t('save')}</button><p id="je" class="err"></p></div>`}
 
-function gate(){return `<div class="hero"><div class="gem">💎</div><h1>${t('brand')}</h1><p>${t('choose')}</p><div class="row" style="justify-content:center"><button onclick="cty('sy')">${t('sy')}</button><button onclick="cty('iq')">${t('iq')}</button><button onclick="cty('ir')">${t('ir')}</button></div></div>`}
-function cty(c){localStorage.setItem('c',c);R()}
-async function R(){document.documentElement.lang=L;document.documentElement.dir=L==='en'?'ltr':'rtl';document.body.dataset.l=L;if(!localStorage.getItem('c')){$('#app').innerHTML=gate();return}let h=(location.hash||'#/').slice(2).split('/'),p=h[0];if(S?.role==='owner'&&p==='jas-portal'){let [a,b,c]=await Promise.all([sb.from('vendor_requests').select('*'),sb.from('orders').select('*').order('created_at',{ascending:false}),sb.from('support_tickets').select('*').order('created_at',{ascending:false})]);X={reqs:a.data||[],orders:b.data||[],tix:c.data||[]}}else if(S?.role==='vendor'&&p==='vendor'){X={orders:(await sb.from('orders').select('*').eq('vendor_id',S.vid).order('created_at',{ascending:false})).data||[]}}let m=p==='v'?vstore(h[1]):p==='p'?pp(decodeURIComponent(h[1]||'')):p==='cart'?cartv():p==='login'?loginp():p==='register'?loginp(true):p==='vendor-login'?authf('v'):p==='join'?joinp():p==='support'?support():p==='account'?accountp():p==='vendor'?vpanel():p==='jas-portal'?opanel():home();$('#app').innerHTML=`<header><span class="logo" onclick="go()">💎 ${t('brand')}</span><nav>${nav()}</nav></header><main>${m}</main>${footer()}`}
-(async()=>{await who();await load();R()})();
-</script>
-</body>
-</html>
+// --- [تصحيح دالة انضمام البائع لتجنب أخطاء قاعدة البيانات] ---
+async function jr(){
+  let n=$('#jn').value.trim(),p=$('#jp').value.trim(),e=$('#jm').value.trim(),w=$('#jw').value;
+  let je = $('#je');
+  je.textContent = '';
+
+  if(!n||!p||!e||!w){
+    je.textContent='أكمل جميع الحقول المطلوبة';
+    return;
+  }
+
+  // 1. إنشاء حساب المستخدم في نظام التوثيق
+  let r=await sb.auth.signUp({email:e,password:w,options:{data:{name:n}}});
+  if(r.error){
+    je.textContent = r.error.message;
+    return;
+  }
+
+  let userId = r.data.user?.id || null;
+
+  // 2. إدخال البيانات في جدول البائعين أو الطلبات (يتم استخدام جدول vendors أو vendor_requests بحسب المتاح)
+  let {error}=await sb.from('vendor_requests').insert({name:n,phone:p,email:e,user_id:userId});
+  
+  if(error){
+    // محاولة إدراج بديلة في جدول vendors مباشرة إذا كان جدول vendor_requests غير موجود
+    let {error: err2} = await sb.from('vendors').insert({name:n,phone:p,user_id:userId});
+    if(err2){
+      je.textContent = 'حدث خطأ أثناء حفظ الطلب، يرجى المحاولة مجدداً';
+      return;
+    }
+  }
+  
+  je.style.color = 'var(--gold2)';
+  je.textContent = t('sent');
+}
+
+function support(){let s=D.set,wa=String(s.sw||'').replace(/\D/g,'');return `<h1 class="pr">${t('sup
